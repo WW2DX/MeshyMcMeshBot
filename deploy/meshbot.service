@@ -1,0 +1,22 @@
+[Unit]
+Description=MeshyMcMeshBot MeshCore community bot
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+User=meshbot
+Group=meshbot
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/meshbot
+ExecStart=/opt/meshbot/venv/bin/python -m meshymcmeshbot -c /etc/meshbot/config.yaml
+Restart=always
+RestartSec=15
+StateDirectory=meshbot
+# Hardening: the bot only needs the serial port, its DB and the network.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

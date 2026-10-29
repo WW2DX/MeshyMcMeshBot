@@ -1,0 +1,43 @@
+# Copy to config.yaml and edit. Anything you leave out uses the defaults
+# in meshymcmeshbot/config.py.
+
+radio:
+  port: /dev/meshbot        # udev symlink from deploy/99-meshbot.rules (or /dev/ttyACM0)
+
+bot:
+  name: "MeshyMcMeshBot"    # node name the radio advertises
+  channel_idx: 0            # channel slot the bot watches/posts on (0 = Public)
+  prefix: "!"               # channel commands look like "!wx"
+  # Your own node's public key (first 12+ hex chars) - unlocks say/wxnow/addevent/status.
+  admins:
+    - "a1b2c3d4e5f6"
+  quiet_hours: { start: "22:30", end: "05:30" }   # scheduled posts pause; alerts don't
+  db_path: /var/lib/meshbot/meshbot.sqlite3
+
+location:
+  name: "Your County"
+  lat: 41.2565
+  lon: -95.9345
+  timezone: America/Chicago
+
+weather:
+  user_agent: "MeshyMcMeshBot (you@example.com)"   # NWS asks for contact info
+  post_times: ["06:00", "10:00", "14:00", "18:00", "22:00"]
+  alerts:
+    min_severity: Severe    # Minor | Moderate | Severe | Extreme
+
+news:
+  post_times: ["08:00", "17:00"]
+  feeds:
+    # Local paper / county / school district RSS feeds. Examples:
+    # - { name: "County", url: "https://www.example-county.gov/RSSFeed.aspx?ModID=1" }
+    # - { name: "Herald", url: "https://www.example-herald.com/feed/" }
+
+events:
+  post_times: ["07:30"]
+  ical_urls:
+    # A public Google Calendar: Settings > Integrate calendar > "Public address in iCal format"
+    # - "https://calendar.google.com/calendar/ical/xxxx%40group.calendar.google.com/public/basic.ics"
+
+stats:
+  post_times: ["21:00"]     # nightly "mesh today" digest; [] to disable

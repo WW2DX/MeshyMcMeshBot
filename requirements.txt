@@ -1,0 +1,7 @@
+meshcore>=2.3
+httpx>=0.27
+feedparser>=6.0
+icalendar>=6.0
+recurring-ical-events>=3.0
+astral>=3.2
+PyYAML>=6.0

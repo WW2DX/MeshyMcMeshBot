@@ -97,6 +97,7 @@ right away. Repeated restarts don't flood the mesh with adverts.
 - Change a setting without the mesh: `sudo meshbot --set channel
   '#mycounty' --set botname CountyBot && sudo systemctl restart meshbot`.
   (Quote `#` names, or the shell treats them as a comment.)
+- Advertise now: `sudo meshbot --advert && sudo systemctl restart meshbot`.
 
 **Prefer a config file?** It's optional. Put any of the settings from
 `config.example.yaml` in `/etc/meshbot/config.yaml`. Values set over the mesh

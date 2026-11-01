@@ -14,6 +14,7 @@ Removed. When cutting a release, rename that heading to the version and date.
   missing from the radio is added automatically.
 - `sudo meshbot --set <name> <value>` changes a setting from the Pi, and
   `sudo meshbot` runs other maintenance options as the service user.
+- `sudo meshbot --advert` makes the bot advertise as soon as it restarts.
 - Initial bot for a MeshCore public channel, connected to a USB Companion
   node (Wio Tracker L1) over serial.
 - Weather: NWS forecast posted at 06/10/14/18/22, compacted to fit one packet;

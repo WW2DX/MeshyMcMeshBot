@@ -2,4 +2,5 @@
 # Run bot maintenance commands as the service user, e.g.
 #   sudo meshbot --set channel '#mycounty'
 #   sudo meshbot --setup-code
+cd /opt/meshbot || exit 1  # the bot runs from its install directory
 exec sudo -u meshbot env STATE_DIRECTORY=/var/lib/meshbot /opt/meshbot/venv/bin/python -m meshymcmeshbot "$@"

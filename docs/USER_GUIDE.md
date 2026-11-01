@@ -1,8 +1,9 @@
 # MeshyMcMeshBot User Guide
 
 MeshyMcMeshBot is a community bot on our county's MeshCore public channel. It
-posts weather, severe-weather alerts, local news and events, and it can hold
-mail for you until your node is back on the mesh.
+posts weather, local news and events, and warnings for severe weather,
+flooding, earthquakes and bad air. It can also hold mail for you until your
+node is back on the mesh.
 
 This guide is for people *using* the bot from the MeshCore app. To run your
 own copy, see the [README](../README.md).
@@ -17,6 +18,9 @@ own copy, see the [README](../README.md).
    shows up in your Contacts list, you can DM it. If you don't see it, ask in
    the channel or wait for the next advert.
 3. **Say hi.** Post `!help` in the channel, or DM the bot `help`.
+
+New to the mesh? The first time the bot hears your node, it DMs you a short
+welcome with a few tips.
 
 ### Channel vs. DM
 
@@ -47,6 +51,19 @@ WX Today: Sunny, Hi 68°F, E 7mph | Tonight: Sl chc T-storms, Lo 52°F, E 6mph, 
 The forecast uses some abbreviations: *Sl chc* = slight chance,
 *Chc* = chance, *Ptly* = partly, *Lt/Hvy* = light/heavy.
 
+### Air, water & earthquakes
+
+| Command | What you get |
+|---|---|
+| `aqi` (or `air`) | Current air quality index (US AQI) and what it means |
+| `river` (or `rivers`) | Local river levels, flood stage, and whether they're rising |
+| `quakes` (or `eq`) | Earthquakes M3+ within 250 km in the past week (USGS) |
+
+```
+!river
+🌊 Missouri River at Omaha 13.7ft (flood 27ft), steady
+```
+
 ### News & events
 
 | Command | What you get |
@@ -61,6 +78,7 @@ The forecast uses some abbreviations: *Sl chc* = slight chance,
 | `ping` (or `test`) | Checks that the bot hears you, with your hop count and signal (SNR) |
 | `seen <name>` | When a node was last heard, e.g. `!seen Bob K` |
 | `stats` (or `nodes`) | Nodes heard and channel activity over the last 24 hours |
+| `repeaters` (or `rpt`) | Repeaters the bot has heard in the past week, and when. ⚠️ marks a watched repeater that's gone quiet |
 
 ```
 !ping
@@ -84,7 +102,7 @@ they're offline right now.
 
 | Command | What it does |
 |---|---|
-| `mail <name> <message>` | Leave a message, e.g. `mail Bob K see you at the net` |
+| `mail <name> <message>` | Leave a message, e.g. `mail Bob K see you at the market` |
 | `mail @<key> <message>` | Address by public-key prefix if two nodes share a name, e.g. `mail @a1b2c3 hi` |
 | `inbox` | How many messages are waiting, and from whom |
 | `read` (or `r`) | Deliver your messages (3 at a time; send `read` again for more) |
@@ -121,10 +139,21 @@ Notes expire after 14 days, and the board keeps the 50 newest.
 | New local headlines | 8am, 5pm (only if there's something new) |
 | Upcoming events | 7:30am |
 | Mesh stats for the day | 9pm |
-| ⚠️ Severe weather alerts | As soon as NWS issues them, any time of day |
 
-Between 10:30pm and 5:30am, scheduled posts are paused. Severe weather alerts
-still go out.
+### Automatic alerts
+
+These go out when something happens, not on a schedule:
+
+| Alert | When it posts |
+|---|---|
+| ⚠️ Severe weather | Severe or Extreme NWS alerts, within 5 minutes |
+| 🌊 Flooding | When a local river reaches (or is forecast to reach) flood stage, and again when it drops back below |
+| 🌎 Earthquakes | Within minutes of a nearby M3+ quake (USGS) |
+| 😷 Air quality | When the AQI reaches 151 (Unhealthy), and again when it improves |
+
+Between 10:30pm and 5:30am, scheduled posts and air-quality notices are
+paused. Severe weather and flood alerts always go out, and so do earthquakes
+of M5 or larger.
 
 ## Etiquette & limits
 
@@ -149,7 +178,25 @@ Please use DMs for anything long or personal.
 
 ## Admin commands
 
-Admin commands only work by DM from an operator's node.
+Admin commands only work by DM from an operator's node. The bot is set up
+entirely over the mesh. Its first admin claims it with the code printed at
+install time (`claim <code>`), then sets the area with `zip <code>`. Admins
+can add other admins with `add admin <name>`.
+
+| Command | What it does |
+|---|---|
+| `setup` | Checklist of what's configured and what to do next |
+| `zip <code>` | Set the bot's area from a US ZIP code |
+| `settings` | List everything that can be changed |
+| `set <name> <value>` | Change a setting, e.g. `set quiet 23:00-06:00`, `set quakes off` |
+| `set <name>` / `unset <name>` | Show a setting / put it back to default |
+| `add`, `list`, `del` `<feed\|cal\|gauge\|repeater\|admin>` | Manage news feeds, calendars, river gauges, watched repeaters and admins |
+| `restart` | Restart the bot |
+
+Most changes take effect about 15 seconds after the last one, when the bot
+restarts itself.
+
+Day-to-day admin commands:
 
 | Command | What it does |
 |---|---|
@@ -159,3 +206,7 @@ Admin commands only work by DM from an operator's node.
 | `delevent <id>` | Remove an event |
 | `unpost <id>` | Remove any bulletin board note |
 | `status` | Bot health: uptime, contacts, queue, undelivered mail, radio battery |
+
+Operators can also have the bot watch specific repeaters. If one isn't heard
+for 24 hours (no advert and no relayed traffic), admins get a DM. They get
+another when it comes back.

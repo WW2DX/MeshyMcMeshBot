@@ -11,9 +11,17 @@ import logging
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Awaitable, Callable
 
 log = logging.getLogger(__name__)
+
+# MeshCore advert node types.
+NODE_CHAT, NODE_REPEATER, NODE_ROOM, NODE_SENSOR = 1, 2, 3, 4
+NODE_TYPE_NAMES = {NODE_CHAT: "chat", NODE_REPEATER: "repeater", NODE_ROOM: "room", NODE_SENSOR: "sensor"}
+
+# Ignore a second report of the same advert (RX log + push) within this window.
+ADVERT_DEDUPE_SECONDS = 30
 
 
 @dataclass
@@ -27,16 +35,30 @@ class Incoming:
     ts: int = 0
 
 
+@dataclass
+class Advert:
+    pubkey: str
+    name: str = ""
+    node_type: int | None = None
+    lat: float | None = None
+    lon: float | None = None
+
+
 Handler = Callable[[Incoming], Awaitable[None]]
-AdvertHandler = Callable[[str], Awaitable[None]]
+AdvertHandler = Callable[[Advert], Awaitable[None]]
+# Called with the hex path hashes of repeaters a received packet passed through.
+RelayHandler = Callable[[list[str]], Awaitable[None]]
 
 
 class Transport:
     on_message: Handler
     on_advert: AdvertHandler
+    on_relay: RelayHandler
     self_name: str = "bot"
+    self_key: str = ""
 
     async def start(self): ...
+    async def close(self): ...
     async def send_channel(self, text: str) -> bool: ...
     async def send_dm(self, pubkey: str, text: str) -> bool: ...
     async def advert(self): ...
@@ -44,7 +66,7 @@ class Transport:
         return ""
 
     def contacts(self) -> dict[str, dict]:
-        """pubkey -> {"name", "last_advert", "lat", "lon"}"""
+        """pubkey -> {"name", "last_advert", "lat", "lon", "type"}"""
         return {}
 
     def find_contact_by_prefix(self, prefix: str) -> str | None:
@@ -58,31 +80,53 @@ class Transport:
         return True
 
 
+def candidate_ports() -> list[str]:
+    """USB serial devices that could be the companion, most likely first."""
+    from serial.tools import list_ports
+
+    ports = ["/dev/meshbot"] if Path("/dev/meshbot").exists() else []
+    for p in sorted(list_ports.comports(), key=lambda p: p.device):
+        if p.vid is not None and p.device not in ports:  # skip non-USB (e.g. Pi UART)
+            ports.append(p.device)
+    return ports
+
+
+def split_path(path_hex: str, hash_size: int) -> list[str]:
+    step = hash_size * 2
+    return [path_hex[i:i + step] for i in range(0, len(path_hex) - step + 1, step)]
+
+
 class MeshCoreTransport(Transport):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.mc = None
         self.channel_idx = cfg["bot"]["channel_idx"]
+        self._recent_adverts: dict[str, float] = {}
 
     async def start(self):
         from meshcore import EventType, MeshCore
 
         port = self.cfg["radio"]["port"]
-        log.info("Connecting to MeshCore companion on %s", port)
-        self.mc = await MeshCore.create_serial(
-            port,
-            self.cfg["radio"]["baudrate"],
-            auto_reconnect=True,
-            max_reconnect_attempts=10,
-        )
+        candidates = candidate_ports() if port == "auto" else [port]
+        for dev in candidates:
+            log.info("Trying MeshCore companion on %s", dev)
+            self.mc = await MeshCore.create_serial(
+                dev,
+                self.cfg["radio"]["baudrate"],
+                auto_reconnect=True,
+                max_reconnect_attempts=10,
+            )
+            if self.mc is not None:
+                break
         if self.mc is None:
             raise RuntimeError(
-                f"No MeshCore companion answered on {port}. "
-                "Is the L1 flashed with *USB Companion* firmware?"
+                f"No MeshCore companion answered on {', '.join(candidates) or 'any USB serial port'}. "
+                "Is the L1 plugged in and flashed with *USB Companion* firmware?"
             )
 
         info = self.mc.self_info or {}
         self.self_name = info.get("name", "bot")
+        self.self_key = info.get("public_key", "").lower()
         want = self.cfg["bot"]["name"]
         if want and want != self.self_name:
             await self.mc.commands.set_name(want)
@@ -101,7 +145,9 @@ class MeshCoreTransport(Transport):
 
         self.mc.subscribe(EventType.CHANNEL_MSG_RECV, self._on_channel)
         self.mc.subscribe(EventType.CONTACT_MSG_RECV, self._on_dm)
-        self.mc.subscribe(EventType.ADVERTISEMENT, self._on_advert)
+        self.mc.subscribe(EventType.ADVERTISEMENT, self._on_advert_push)
+        self.mc.subscribe(EventType.NEW_CONTACT, self._on_new_contact)
+        self.mc.subscribe(EventType.RX_LOG_DATA, self._on_rx_log)
         await self.mc.start_auto_message_fetching()
 
     @staticmethod
@@ -142,10 +188,51 @@ class MeshCoreTransport(Transport):
             hops=self._hops(p), snr=p.get("SNR"), ts=p.get("sender_timestamp", 0),
         ))
 
-    async def _on_advert(self, event):
+    async def _emit_advert(self, adv: Advert):
+        if adv.pubkey.lower() == self.self_key:  # our own advert, echoed back by a repeater
+            return
+        now = time.monotonic()
+        if now - self._recent_adverts.get(adv.pubkey, 0) < ADVERT_DEDUPE_SECONDS:
+            return
+        self._recent_adverts[adv.pubkey] = now
+        await self.on_advert(adv)
+
+    async def _on_advert_push(self, event):
         # Let the library pull the updated contact list first so names are fresh.
         await self.mc.ensure_contacts(follow=True)
-        await self.on_advert(event.payload["public_key"])
+        key = event.payload["public_key"]
+        c = (self.mc.contacts or {}).get(key, {})
+        await self._emit_advert(Advert(
+            key, c.get("adv_name", ""), c.get("type"), c.get("adv_lat") or None, c.get("adv_lon") or None,
+        ))
+
+    async def _on_new_contact(self, event):
+        # The radio is in manual-add mode and heard a new node. The bot can only
+        # DM contacts (mail notices, welcomes), so add chat nodes.
+        c = event.payload
+        if c.get("type") == NODE_CHAT:
+            await self.mc.commands.add_contact(c)
+            await self.mc.ensure_contacts(follow=True)
+        await self._emit_advert(Advert(
+            c["public_key"], c.get("adv_name", ""), c.get("type"), c.get("adv_lat") or None, c.get("adv_lon") or None,
+        ))
+
+    async def _on_rx_log(self, event):
+        # Every packet the radio hears, decoded. Two things matter here:
+        # adverts (even from nodes not in contacts) and the path of repeaters
+        # each flood packet travelled through.
+        p = event.payload
+        if p.get("adv_key"):
+            await self._emit_advert(Advert(
+                p["adv_key"], p.get("adv_name", ""), p.get("adv_type"),
+                p.get("adv_lat") or None, p.get("adv_lon") or None,
+            ))
+        if p.get("path") and p.get("route_typename", "").upper().startswith(("FLOOD", "TC_FLOOD")):
+            await self.on_relay(split_path(p["path"], p.get("path_hash_size", 1)))
+
+    async def close(self):
+        if self.mc is not None:
+            await self.mc.disconnect()
 
     def contacts(self) -> dict[str, dict]:
         out = {}
@@ -155,6 +242,7 @@ class MeshCoreTransport(Transport):
                 "last_advert": c.get("last_advert", 0),
                 "lat": c.get("adv_lat") or None,
                 "lon": c.get("adv_lon") or None,
+                "type": c.get("type"),
             }
         return out
 
@@ -197,7 +285,9 @@ class ConsoleTransport(Transport):
 
         Alice: !wx              Alice posts on the channel
         dm Alice: mail Bob hi   Alice DMs the bot
-        advert Bob              Bob's node advertises (triggers mail notices)
+        advert Bob              Bob's node advertises (new names get a welcome)
+        repeater Hilltop        a repeater named Hilltop advertises
+        relay Hilltop           a packet arrives that Hilltop repeated
     """
 
     def __init__(self, cfg: dict):
@@ -205,10 +295,11 @@ class ConsoleTransport(Transport):
         self.self_name = cfg["bot"]["name"] or "MeshyMcMeshBot"
         self._contacts: dict[str, dict] = {}
 
-    def _key_for(self, name: str) -> str:
+    def _key_for(self, name: str, node_type: int = NODE_CHAT) -> str:
         key = hashlib.sha256(name.lower().encode()).hexdigest()
         if key not in self._contacts:
-            self._contacts[key] = {"name": name, "last_advert": int(time.time()), "lat": None, "lon": None}
+            self._contacts[key] = {"name": name, "last_advert": int(time.time()),
+                                   "lat": None, "lon": None, "type": node_type}
         return key
 
     async def start(self):
@@ -231,10 +322,16 @@ class ConsoleTransport(Transport):
                 log.exception("Error handling console input")
 
     async def _handle_line(self, line: str):
-        if line.startswith("advert "):
-            key = self._key_for(line[7:].strip())
+        word, _, rest = line.partition(" ")
+        if word in ("advert", "repeater"):
+            node_type = NODE_REPEATER if word == "repeater" else NODE_CHAT
+            name = rest.strip()
+            key = self._key_for(name, node_type)
             self._contacts[key]["last_advert"] = int(time.time())
-            await self.on_advert(key)
+            await self.on_advert(Advert(key, name, node_type))
+            return
+        if word == "relay":
+            await self.on_relay([self._key_for(rest.strip(), NODE_REPEATER)[:2]])
             return
         kind = "chan"
         if line.startswith("dm "):

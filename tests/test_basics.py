@@ -43,7 +43,8 @@ def test_weather_formatting_is_compact():
 @pytest.fixture
 def bot(tmp_path, monkeypatch):
     path = tmp_path / "c.yaml"
-    path.write_text(f"bot: {{db_path: '{tmp_path}/t.db', quiet_hours: {{start: '22:00', end: '06:00'}}}}\n")
+    path.write_text(f"bot: {{db_path: '{tmp_path}/t.db', quiet_hours: {{start: '22:00', end: '06:00'}}}}\n"
+                    "location: {lat: 41.26, lon: -95.94, timezone: America/Chicago, name: Test}\n")
     cfg = config.load(path)
     b = Bot(cfg, ConsoleTransport(cfg))
     mailbox.setup(b)
@@ -54,9 +55,9 @@ def test_mail_resolves_names_with_spaces(bot):
     box = mailbox.Mailbox(bot)
     bob = bot.t._key_for("Bob K")
     bot.t._key_for("Bob")
-    matches, body = box.resolve("bob k see you at the net")
+    matches, body = box.resolve("bob k see you at the market")
     assert matches == [(bob, "Bob K")]
-    assert body == "see you at the net"
+    assert body == "see you at the market"
 
 
 def test_mail_is_bound_to_pubkey(bot):

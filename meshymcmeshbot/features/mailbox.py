@@ -131,8 +131,8 @@ def setup(bot):
         left = len(msgs) - len(batch)
         return f"{left} more - send 'read' again." if left else None
 
-    async def on_seen(key: str):
-        await box.maybe_notify(key)
+    async def on_seen(adv, is_new):
+        await box.maybe_notify(adv.pubkey)
 
     async def on_message(msg):
         if msg.kind == "dm" and msg.sender_key:

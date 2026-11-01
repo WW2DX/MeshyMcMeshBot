@@ -1,4 +1,5 @@
-# Gives the L1 a stable name (/dev/meshbot) no matter which USB port it's in.
+# Optional: the bot auto-detects the L1 on any USB serial port. This rule just
+# gives it a stable name (/dev/meshbot), which the bot tries first.
 # Find your IDs with:  udevadm info -a -n /dev/ttyACM0 | grep -E 'idVendor|idProduct' | head -2
 # Seeed nRF52 boards usually report 2886:xxxx; adjust idProduct to match yours.
 SUBSYSTEM=="tty", ATTRS{idVendor}=="2886", SYMLINK+="meshbot", MODE="0660", GROUP="dialout"

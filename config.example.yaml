@@ -1,24 +1,27 @@
-# Copy to config.yaml and edit. Anything you leave out uses the defaults
-# in meshymcmeshbot/config.py.
+# OPTIONAL. The bot needs no config file: claim it with the setup code and
+# configure it over the mesh by DM (see README). If you'd rather use a file, copy
+# this to /etc/meshbot/config.yaml. Settings made over the mesh take precedence.
+# Anything left out uses the defaults in meshymcmeshbot/config.py.
 
 radio:
-  port: /dev/meshbot        # udev symlink from deploy/99-meshbot.rules (or /dev/ttyACM0)
+  port: auto                # or a device like /dev/ttyACM0
 
 bot:
   name: "MeshyMcMeshBot"    # node name the radio advertises
   channel_idx: 0            # channel slot the bot watches/posts on (0 = Public)
   prefix: "!"               # channel commands look like "!wx"
-  # Your own node's public key (first 12+ hex chars) - unlocks say/wxnow/addevent/status.
-  admins:
-    - "a1b2c3d4e5f6"
+  # Admin public keys (12+ hex chars). Usually set by 'claim' over the mesh instead.
+  # admins:
+  #   - "a1b2c3d4e5f6"
   quiet_hours: { start: "22:30", end: "05:30" }   # scheduled posts pause; alerts don't
-  db_path: /var/lib/meshbot/meshbot.sqlite3
 
 location:
-  name: "Your County"
-  lat: 41.2565
-  lon: -95.9345
-  timezone: America/Chicago
+  # zip: "68102"            # quote it! Fills in lat/lon, timezone and the area name.
+  # Optional overrides (otherwise looked up from the ZIP):
+  # name: "Douglas County"  # used in welcomes and `about`
+  # lat: 41.2565
+  # lon: -95.9345
+  # timezone: America/Chicago
 
 weather:
   user_agent: "MeshyMcMeshBot (you@example.com)"   # NWS asks for contact info
@@ -41,3 +44,29 @@ events:
 
 stats:
   post_times: ["21:00"]     # nightly "mesh today" digest; [] to disable
+
+welcome:
+  settle_days: 3            # after a fresh install, wait before greeting "new" nodes
+  # message: "👋 Welcome to the {area} mesh, {name}! ..."
+
+repeaters:
+  # MeshCore repeaters to watch: public-key prefixes (8+ hex) or exact names.
+  watch: []
+  #  - "Hilltop Rptr"
+  #  - "a1b2c3d4"
+  offline_hours: 24
+  notify: admins            # admins (DM) | channel
+
+quakes:
+  radius_km: 250
+  min_magnitude: 3.0
+
+rivers:
+  # Gauge IDs from https://water.noaa.gov - search your river, the ID is in the URL.
+  gauges: []
+  #  - "OMHN1"
+  alert_category: minor     # action | minor | moderate | major
+
+air:
+  airnow_api_key: ""        # optional: free key from https://docs.airnowapi.org
+  alert_aqi: 151

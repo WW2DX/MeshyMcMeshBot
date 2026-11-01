@@ -5,3 +5,6 @@ venv/
 config.yaml
 *.sqlite3
 .pytest_cache/
+*.location.json
+data/
+setup-code.txt

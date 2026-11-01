@@ -34,9 +34,14 @@ Check that the repo is up to date before you edit anything:
 ## Working on the code
 
 - Tests: `python -m pytest -q tests`
-- Try it without a radio: `python -m meshymcmeshbot -c config.yaml --console`
+- Try it without a radio: `STATE_DIRECTORY=./data python -m meshymcmeshbot --console`
 - The target is Python 3.11 (Raspberry Pi OS Bookworm). Don't use newer syntax.
 - Messages must fit in about 140 UTF-8 bytes. Use the helpers in `text.py`;
   never split by character count.
 - New features go in `meshymcmeshbot/features/<name>.py` with a `setup(bot)`
   function, registered in `features/__init__.py`.
+- The bot is configured over the mesh, not on the Pi. Any new user-tunable
+  value belongs in `settings.SETTINGS` (or `settings.LISTS`) so admins can
+  change it by DM, and the user guide's admin section should mention it.
+- Features that need a location go in `NEEDS_LOCATION` in
+  `features/__init__.py`, so an unconfigured bot still starts.

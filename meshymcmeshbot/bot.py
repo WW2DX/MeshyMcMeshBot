@@ -13,7 +13,7 @@ import httpx
 
 from .db import DB
 from .text import paginate
-from .transport import Incoming, Transport
+from .transport import Advert, Incoming, Transport
 
 log = logging.getLogger(__name__)
 
@@ -62,15 +62,22 @@ class Job:
     _last_slot: str = ""
 
 
+class RestartRequested(Exception):
+    """Raised out of Bot.run() so __main__ can re-exec with fresh settings."""
+
+
 class Bot:
-    def __init__(self, cfg: dict, transport: Transport):
+    def __init__(self, cfg: dict, transport: Transport, db: DB | None = None):
         self.cfg = cfg
         self.bcfg = cfg["bot"]
         self.t = transport
         self.t.on_message = self._on_message
         self.t.on_advert = self._on_advert
-        self.db = DB(self.bcfg["db_path"])
-        self.tz = ZoneInfo(cfg["location"]["timezone"])
+        self.t.on_relay = self._on_relay
+        self.db = db or DB(self.bcfg["db_path"])
+        tz = cfg["location"]["timezone"]
+        # Before a ZIP is set there's no timezone yet; use the Pi's.
+        self.tz = ZoneInfo(tz) if tz else datetime.now().astimezone().tzinfo
         self.http = httpx.AsyncClient(
             timeout=20,
             headers={"User-Agent": cfg["weather"]["user_agent"]},
@@ -78,8 +85,12 @@ class Bot:
         )
         self.commands: dict[str, Command] = {}
         self.jobs: list[Job] = []
-        self.advert_hooks: list[Callable[[str], Awaitable[None]]] = []
+        # Called as hook(advert, is_new); is_new means we'd never heard this node before.
+        self.advert_hooks: list[Callable[[Advert, bool], Awaitable[None]]] = []
         self.message_hooks: list[Callable[[Incoming], Awaitable[None]]] = []
+        # Run once the radio is connected.
+        self.startup_hooks: list[Callable[[], Awaitable[None]]] = []
+        self._restart_at: float | None = None
         self._queue: asyncio.Queue = asyncio.Queue()
         self._cooldowns: dict[str, float] = {}
         self.started = time.time()
@@ -98,6 +109,19 @@ class Bot:
         self.jobs.append(Job(name, fn, list(times or []), every_seconds, respect_quiet_hours))
 
     # --- helpers ------------------------------------------------------------
+
+    @property
+    def has_location(self) -> bool:
+        loc = self.cfg["location"]
+        return loc.get("lat") is not None and loc.get("lon") is not None
+
+    @property
+    def restart_pending(self) -> bool:
+        return self._restart_at is not None
+
+    def request_restart(self, delay: float = 15):
+        """Restart to apply settings once things go quiet. Each call pushes it back."""
+        self._restart_at = time.monotonic() + delay
 
     def now(self) -> datetime:
         return datetime.now(self.tz)
@@ -235,15 +259,18 @@ class Bot:
         self._cooldowns[sender] = now
         return False
 
-    async def _on_advert(self, pubkey: str):
-        c = self.t.contacts().get(pubkey)
-        if c:
-            self.db.upsert_node(pubkey, c["name"], c.get("lat"), c.get("lon"))
+    async def _on_advert(self, adv: Advert):
+        is_new = self.db.node(adv.pubkey) is None
+        log.info("Advert from %r (type %s)%s", adv.name, adv.node_type, " NEW" if is_new else "")
+        self.db.upsert_node(adv.pubkey, adv.name, adv.lat, adv.lon, adv.node_type)
         for hook in self.advert_hooks:
             try:
-                await hook(pubkey)
+                await hook(adv, is_new)
             except Exception:
                 log.exception("Advert hook failed")
+
+    async def _on_relay(self, hashes: list[str]):
+        self.db.mark_relays(hashes)
 
     # --- scheduling ---------------------------------------------------------
 
@@ -279,7 +306,7 @@ class Bot:
     def _sync_contacts(self):
         for key, c in self.t.contacts().items():
             if c["name"]:
-                self.db.upsert_node(key, c["name"], c.get("lat"), c.get("lon"), c.get("last_advert") or None)
+                self.db.sync_node(key, c["name"], c.get("lat"), c.get("lon"), c.get("type"), c.get("last_advert"))
 
     async def run(self):
         await self.t.start()
@@ -290,15 +317,40 @@ class Bot:
             self._sync_contacts()
             self.db.prune()
 
+        async def advert():
+            # Checked often but sent rarely; the timestamp survives restarts so
+            # applying settings doesn't flood an advert each time.
+            last = float(self.db.get_meta("last_advert") or 0)
+            if time.time() - last >= self.bcfg["advert_hours"] * 3600:
+                await self.t.advert()
+                self.db.set_meta("last_advert", str(time.time()))
+
         self.schedule("housekeeping", housekeeping, every_seconds=600, respect_quiet_hours=False)
         if self.bcfg["advert_hours"]:
-            self.schedule("advert", self.t.advert,
-                          every_seconds=int(self.bcfg["advert_hours"] * 3600),
-                          respect_quiet_hours=False)
+            self.schedule("advert", advert, every_seconds=600, respect_quiet_hours=False)
+
+        for hook in self.startup_hooks:
+            try:
+                await hook()
+            except Exception:
+                log.exception("Startup hook failed")
 
         log.info("Bot running with %d commands, %d jobs",
                  len({c.name for c in self.commands.values()}), len(self.jobs))
-        await asyncio.gather(self._sender(), self._scheduler(), self._watchdog())
+        try:
+            await asyncio.gather(self._sender(), self._scheduler(), self._watchdog(), self._restarter())
+        finally:
+            await self.http.aclose()
+            await self.t.close()
+
+    async def _restarter(self):
+        while True:
+            await asyncio.sleep(1)
+            if self._restart_at and time.monotonic() >= self._restart_at and self._queue.empty():
+                # Give the last queued message time to leave the radio.
+                await asyncio.sleep(self.bcfg["tx_gap_seconds"])
+                log.info("Restarting to apply new settings")
+                raise RestartRequested()
 
     async def _watchdog(self):
         """Exit if the radio stays gone; systemd restarts us with a fresh connection."""

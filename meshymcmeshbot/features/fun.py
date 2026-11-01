@@ -22,7 +22,7 @@ def moon_name(phase: float) -> str:
 
 def setup(bot):
     loc = bot.cfg["location"]
-    where = LocationInfo(loc["name"], "", loc["timezone"], loc["lat"], loc["lon"])
+    where = LocationInfo(loc["name"], "", loc["timezone"], loc["lat"], loc["lon"]) if bot.has_location else None
     started = time.time()
 
     @bot.command("help", "help [cmd]: list commands", aliases=("?", "cmds"))
@@ -38,6 +38,8 @@ def setup(bot):
         text = "Cmds: " + " ".join(p + n for n in names)
         if not ctx.is_dm:
             text += " | DM me for mail & bbs"
+        elif ctx.is_admin:
+            text += " | Admin: setup settings set unset add del list zip say status restart"
         return text
 
     @bot.command("ping", "ping: check your signal to the bot", aliases=("test",))
@@ -53,6 +55,8 @@ def setup(bot):
 
     @bot.command("sun", "sun: sunrise & sunset")
     async def _sun(ctx):
+        if where is None:
+            return "I don't know where I am yet (an admin needs to set a ZIP)."
         s = sun(where.observer, date=bot.now().date(), tzinfo=bot.tz)
         f = lambda d: d.strftime("%-I:%M%p").lower()
         length = s["sunset"] - s["sunrise"]
@@ -112,7 +116,7 @@ def setup(bot):
     @bot.command("about", "about: what is this bot", aliases=("info",))
     async def _about(ctx):
         up = int(time.time() - started)
-        return (f"🤖 {bot.t.self_name}: community bot for {loc['name'] or 'the local mesh'}. "
+        return (f"🤖 {bot.t.self_name}: community bot for {loc['name'] or 'this mesh'}. "
                 f"Send {bot.bcfg['prefix']}help. Up {up // 86400}d{up % 86400 // 3600}h")
 
     if bot.cfg["stats"]["post_times"]:

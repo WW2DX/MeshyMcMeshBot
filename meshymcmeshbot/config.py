@@ -88,6 +88,17 @@ DEFAULTS = {
         # Nightly "mesh today" digest on the channel. Empty list disables it.
         "post_times": ["21:00"],
     },
+    "intro": {
+        # Weekly "here's how to use me" post on the channel.
+        "enabled": True,
+        "day": "sun",
+        "times": ["12:00"],
+        # {bot} = bot name, {prefix} = command prefix, {area} = location.name.
+        "message": "👋 I'm the {area} community bot. Send {prefix}help here, or DM me 'help' "
+                   "for weather, news, events & mail.",
+        # Skip the week if no new nodes have appeared since the last intro.
+        "only_if_new": True,
+    },
     "welcome": {
         "enabled": True,
         # {name} = their node name, {area} = location.name, {bot} = bot name.

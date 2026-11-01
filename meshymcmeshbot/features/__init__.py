@@ -1,10 +1,10 @@
 import logging
 
-from . import admin, airquality, events, fun, mailbox, news, quakes, repeaters, rivers, weather, welcome
+from . import admin, airquality, events, fun, intro, mailbox, news, quakes, repeaters, rivers, weather, welcome
 
 log = logging.getLogger(__name__)
 
-ALL = [admin, fun, weather, news, events, mailbox, welcome, repeaters, quakes, rivers, airquality]
+ALL = [admin, fun, weather, news, events, mailbox, welcome, intro, repeaters, quakes, rivers, airquality]
 # These need to know where the bot is; they switch on once an admin sets a ZIP.
 NEEDS_LOCATION = {weather, quakes, rivers, airquality}
 

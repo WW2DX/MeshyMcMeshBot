@@ -139,6 +139,7 @@ Notes expire after 14 days, and the board keeps the 50 newest.
 | New local headlines | 8am, 5pm (only if there's something new) |
 | Upcoming events | 7:30am |
 | Mesh stats for the day | 9pm |
+| A short intro to the bot and how to use it | Sundays at noon, skipped if nobody new has joined the mesh that week |
 
 ### Automatic alerts
 
@@ -189,6 +190,7 @@ then sets the area with `zip <code>`. Admins can add other admins with
 | `setup` | Checklist of what's configured and what to do next |
 | `set channel #name` | The channel the bot posts and listens on. A #hashtag channel is added to the bot's radio automatically. The bot never posts on Public, and stays quiet on channels until this is set. It says hello once on each new channel. |
 | `set botname <name>` | Rename the bot's node |
+| `set introday sun`, `set introtimes 12`, `set intromsg <text>`, `set intro off` | When the weekly intro posts and what it says (`{bot}`, `{prefix}` and `{area}` are filled in) |
 | `zip <code>` | Set the bot's area from a US ZIP code |
 | `settings` | List everything that can be changed |
 | `set <name> <value>` | Change a setting, e.g. `set quiet 23:00-06:00`, `set quakes off` |
@@ -204,7 +206,7 @@ Day-to-day admin commands:
 | Command | What it does |
 |---|---|
 | `say <text>` | Broadcast an announcement on the channel |
-| `wxnow` / `newsnow` | Post the forecast / new headlines right now |
+| `wxnow` / `newsnow` / `intronow` | Post the forecast / new headlines / the bot's intro right now |
 | `addevent YYYY-MM-DD [HH:MM] <title>` | Add a community event |
 | `delevent <id>` | Remove an event |
 | `unpost <id>` | Remove any bulletin board note |

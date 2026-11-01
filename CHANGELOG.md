@@ -10,6 +10,10 @@ Removed. When cutting a release, rename that heading to the version and date.
 ## [Unreleased]
 
 ### Added
+- A weekly intro post on the channel (Sundays at noon by default) tells
+  newcomers the bot exists and how to use it. It's skipped in weeks when no
+  new nodes appeared. Admins can tune it with `introday`, `introtimes`,
+  `intromsg`, `set intro off`, and post it now with `intronow`.
 - `set channel #name` picks the bot's channel by name, and a #hashtag channel
   missing from the radio is added automatically.
 - `sudo meshbot --set <name> <value>` changes a setting from the Pi, and

@@ -135,7 +135,7 @@ On the channel, prefix commands with `!`. In a DM, the prefix is optional.
 | `mail <name> <msg>` | DM | leave mail (names with spaces work; `@a1b2c3` = key prefix) |
 | `inbox`, `read` | DM | check / receive mail |
 | `post <text>`, `bbs`, `unpost <id>` | DM | bulletin board |
-| `say`, `wxnow`, `newsnow`, `addevent`, `delevent`, `status` | DM, admin | admin tools |
+| `say`, `wxnow`, `newsnow`, `intronow`, `addevent`, `delevent`, `status` | DM, admin | admin tools |
 | `claim`, `zip`, `setup`, `set`, `add`, `del`, `list`, `restart` | DM, admin | configuration (see above) |
 
 **Scheduled posts** (all times are configurable):

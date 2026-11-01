@@ -8,7 +8,7 @@ import json
 import re
 from dataclasses import dataclass
 
-FEATURES = ("weather", "news", "events", "mailbox", "bbs", "welcome",
+FEATURES = ("weather", "news", "events", "mailbox", "bbs", "welcome", "intro",
             "repeaters", "quakes", "rivers", "air")
 
 
@@ -45,6 +45,10 @@ SETTINGS = [
     Setting("rptnotify", "repeaters.notify", "choice", "who hears about repeater outages",
             ("admins", "channel")),
     Setting("welcomemsg", "welcome.message", "str", "welcome DM ({name} {area} {bot})"),
+    Setting("introday", "intro.day", "choice", "day of the weekly intro post",
+            ("mon", "tue", "wed", "thu", "fri", "sat", "sun")),
+    Setting("introtimes", "intro.times", "times", "time(s) of the weekly intro post"),
+    Setting("intromsg", "intro.message", "str", "weekly intro ({bot} {prefix} {area})"),
 ] + [Setting(f, f"{f}.enabled", "bool", f"turn {f} on/off") for f in FEATURES]
 
 BY_KEY = {s.key: s for s in SETTINGS}

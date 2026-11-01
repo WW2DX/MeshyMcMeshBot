@@ -180,12 +180,15 @@ Please use DMs for anything long or personal.
 
 Admin commands only work by DM from an operator's node. The bot is set up
 entirely over the mesh. Its first admin claims it with the code printed at
-install time (`claim <code>`), then sets the area with `zip <code>`. Admins
-can add other admins with `add admin <name>`.
+install time (`claim <code>`), picks the channel with `set channel #name`,
+then sets the area with `zip <code>`. Admins can add other admins with
+`add admin <name>`.
 
 | Command | What it does |
 |---|---|
 | `setup` | Checklist of what's configured and what to do next |
+| `set channel #name` | The channel the bot posts and listens on. A #hashtag channel is added to the bot's radio automatically. The bot never posts on Public, and stays quiet on channels until this is set. It says hello once on each new channel. |
+| `set botname <name>` | Rename the bot's node |
 | `zip <code>` | Set the bot's area from a US ZIP code |
 | `settings` | List everything that can be changed |
 | `set <name> <value>` | Change a setting, e.g. `set quiet 23:00-06:00`, `set quakes off` |

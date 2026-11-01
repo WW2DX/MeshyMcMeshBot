@@ -20,6 +20,9 @@ log = logging.getLogger(__name__)
 NODE_CHAT, NODE_REPEATER, NODE_ROOM, NODE_SENSOR = 1, 2, 3, 4
 NODE_TYPE_NAMES = {NODE_CHAT: "chat", NODE_REPEATER: "repeater", NODE_ROOM: "room", NODE_SENSOR: "sensor"}
 
+# The well-known key of the default Public channel. The bot never posts there.
+PUBLIC_CHANNEL_SECRET = bytes.fromhex("8b3387e9c5cdea6ac9e5edbaa115cd72")
+
 # Ignore a second report of the same advert (RX log + push) within this window.
 ADVERT_DEDUPE_SECONDS = 30
 
@@ -56,6 +59,7 @@ class Transport:
     on_relay: RelayHandler
     self_name: str = "bot"
     self_key: str = ""
+    channel_name: str = ""  # empty until the bot has a channel to post on
 
     async def start(self): ...
     async def close(self): ...
@@ -100,7 +104,7 @@ class MeshCoreTransport(Transport):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.mc = None
-        self.channel_idx = cfg["bot"]["channel_idx"]
+        self.channel_idx: int | None = None
         self._recent_adverts: dict[str, float] = {}
 
     async def start(self):
@@ -131,14 +135,13 @@ class MeshCoreTransport(Transport):
         if want and want != self.self_name:
             await self.mc.commands.set_name(want)
             self.self_name = want
+            await self.mc.commands.send_advert(flood=True)  # so contact lists pick up the new name
         log.info("Connected as %r (%s)", self.self_name, info.get("public_key", "")[:12])
 
         # The Pi has NTP; the radio may not. Message timestamps come from the radio.
         await self.mc.commands.set_time(int(time.time()))
 
-        chan = await self.mc.commands.get_channel(self.channel_idx)
-        if chan.type != EventType.ERROR:
-            log.info("Bot channel %d is %r", self.channel_idx, chan.payload.get("channel_name"))
+        await self._find_channel()
 
         self.mc.auto_update_contacts = True
         await self.mc.ensure_contacts()
@@ -150,6 +153,44 @@ class MeshCoreTransport(Transport):
         self.mc.subscribe(EventType.RX_LOG_DATA, self._on_rx_log)
         await self.mc.start_auto_message_fetching()
 
+    async def _find_channel(self):
+        """Point the bot at its channel by name, adding a #hashtag channel if needed."""
+        from meshcore import EventType
+
+        want = self.cfg["bot"]["channel"].strip()
+        if not want:
+            log.warning("No channel set, so the bot won't post. An admin can DM 'set channel #name'.")
+            return
+        info = await self.mc.commands.send_device_query()
+        slots = 8 if info.type == EventType.ERROR else info.payload.get("max_channels", 8)
+        free = None
+        for i in range(slots):
+            res = await self.mc.commands.get_channel(i)
+            if res.type == EventType.ERROR:
+                break
+            name = res.payload.get("channel_name", "")
+            if not name and free is None:
+                free = i
+            if name and name.lower().lstrip("#") == want.lower().lstrip("#"):
+                if res.payload.get("channel_secret") == PUBLIC_CHANNEL_SECRET:
+                    log.error("Channel %r is the Public channel; the bot won't post there.", name)
+                    return
+                self.channel_idx, self.channel_name = i, name
+                log.info("Bot channel is %r (slot %d)", name, i)
+                return
+        if not want.startswith("#"):
+            log.error("Channel %r isn't on the radio. Use a #hashtag channel to have it added.", want)
+            return
+        if free is None:
+            log.error("No free channel slot on the radio for %r", want)
+            return
+        res = await self.mc.commands.set_channel(free, want)
+        if res.type == EventType.ERROR:
+            log.error("Couldn't add channel %r: %s", want, res.payload)
+            return
+        self.channel_idx, self.channel_name = free, want
+        log.info("Added channel %r to the radio (slot %d)", want, free)
+
     @staticmethod
     def _hops(p: dict) -> int | None:
         # path_hash_mode -1 means a direct (non-flood) route; hop count isn't meaningful.
@@ -159,7 +200,7 @@ class MeshCoreTransport(Transport):
 
     async def _on_channel(self, event):
         p = event.payload
-        if p.get("channel_idx") != self.channel_idx:
+        if self.channel_idx is None or p.get("channel_idx") != self.channel_idx:
             return
         raw = p.get("text", "")
         # The firmware sends group text as "<sender name>: <message>".
@@ -247,6 +288,9 @@ class MeshCoreTransport(Transport):
         return out
 
     async def send_channel(self, text: str) -> bool:
+        if self.channel_idx is None:
+            log.info("No channel set; not posting: %s", text)
+            return False
         res = await self.mc.commands.send_chan_msg(self.channel_idx, text)
         if res.is_error():
             log.warning("Channel send failed: %s", res.payload)
@@ -293,6 +337,7 @@ class ConsoleTransport(Transport):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.self_name = cfg["bot"]["name"] or "MeshyMcMeshBot"
+        self.channel_name = cfg["bot"]["channel"] or "#console"
         self._contacts: dict[str, dict] = {}
 
     def _key_for(self, name: str, node_type: int = NODE_CHAT) -> str:

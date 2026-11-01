@@ -16,8 +16,10 @@ DEFAULTS = {
     "bot": {
         # If set, the companion node is renamed to this at startup.
         "name": "",
-        # Index of the channel the bot lives on (0 is usually "Public").
-        "channel_idx": 0,
+        # The channel the bot posts and listens on, e.g. "#mycounty". A #hashtag
+        # channel is added to the radio if missing. The bot never posts on
+        # Public; until this is set it only talks over DM.
+        "channel": "",
         "prefix": "!",
         # Byte budget per message. Channel messages lose room to "<name>: ".
         "max_msg_bytes": 140,

@@ -8,7 +8,7 @@ radio:
 
 bot:
   name: "MeshyMcMeshBot"    # node name the radio advertises
-  channel_idx: 0            # channel slot the bot watches/posts on (0 = Public)
+  channel: "#mycounty"      # channel it posts on; a #hashtag is added to the radio. Never Public.
   prefix: "!"               # channel commands look like "!wx"
   # Admin public keys (12+ hex chars). Usually set by 'claim' over the mesh instead.
   # admins:

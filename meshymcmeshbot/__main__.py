@@ -25,6 +25,9 @@ def main():
                     help="print the one-time setup code for claiming the bot, then exit")
     ap.add_argument("--reset-admins", action="store_true",
                     help="forget all mesh-set admins and issue a new setup code, then exit")
+    ap.add_argument("--set", nargs=2, action="append", metavar=("NAME", "VALUE"),
+                    help="change a setting from the Pi (same names as the 'set' DM command), "
+                         "then exit; restart the bot to apply. Can be repeated.")
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -46,6 +49,19 @@ def main():
     if args.reset_admins:
         admin.reset_admins(db)
         print("Admins cleared. Restart the bot to get a new setup code (or run --setup-code).")
+        return
+    if args.set:
+        for key, raw in args.set:
+            s = settings.BY_KEY.get(key.lower())
+            if s is None:
+                raise SystemExit(f"Unknown setting {key!r}. Known: {' '.join(settings.BY_KEY)}")
+            try:
+                value = settings.parse(s, raw)
+            except ValueError as e:
+                raise SystemExit(f"{s.key}: {e}")
+            settings.save(db, s.path, value)
+            print(f"{s.key} = {settings.show(s, value)}")
+        print("Restart the bot to apply: sudo systemctl restart meshbot")
         return
     settings.apply(cfg, db)
 

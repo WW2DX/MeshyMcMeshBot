@@ -73,10 +73,14 @@ def setup(bot):
     # --- first start ---------------------------------------------------------
 
     async def hello():
-        if not bot.db.get_meta("hello_sent"):
+        # Said once per channel, so moving the bot to a new channel says hello there too.
+        chan = bot.t.channel_name
+        if not chan:
+            return
+        if bot.db.get_meta("hello_sent") != chan:
             await bot.post(f"👋 Hello world! I'm {bot.t.self_name}, a new community bot for this mesh. "
                            "Getting set up - more soon!")
-            bot.db.set_meta("hello_sent", str(int(time.time())))
+            bot.db.set_meta("hello_sent", chan)
         area = bot.cfg["location"]["name"]
         if bot.has_location and area and bot.db.get_meta("announced_area") != area:
             await bot.post(f"📍 Now serving {area}! Send {bot.bcfg['prefix']}help to see what I can do.")
@@ -102,7 +106,12 @@ def setup(bot):
         bot.db.execute("DELETE FROM meta WHERE key IN ('setup_code', 'claim_failures')")
         code_path(bot).unlink(missing_ok=True)
         log.info("Claimed by %s (%s)", ctx.msg.sender_name, ctx.msg.sender_key[:12])
-        nxt = "send 'zip <your ZIP code>'" if not bot.has_location else "send 'setup' for the checklist"
+        if not bot.t.channel_name:
+            nxt = "send 'set channel #yourchannel'"
+        elif not bot.has_location:
+            nxt = "send 'zip <your ZIP code>'"
+        else:
+            nxt = "send 'setup' for the checklist"
         return f"🔑 You're the admin, {ctx.msg.sender_name}! Next, {nxt}."
 
     # --- location ------------------------------------------------------------
@@ -249,12 +258,15 @@ def setup(bot):
             where = f"⏳ ZIP {loc['zip']} (applying)"
         else:
             where = "❌ no ZIP"
+        chan = f"✅ {bot.t.channel_name}" if bot.t.channel_name else "❌ no channel"
         n = lambda path: len(settings.get_path(c, path))
-        text = (f"Setup: {where} | admins {n('bot.admins')} | feeds {n('news.feeds')} | "
+        text = (f"Setup: {chan} | {where} | admins {n('bot.admins')} | feeds {n('news.feeds')} | "
                 f"cals {n('events.ical_urls')} | gauges {n('rivers.gauges')} | "
                 f"repeaters {n('repeaters.watch')}")
         if bot.restart_pending:
             text += " | ⏳ changes apply shortly"
+        elif not bot.t.channel_name:
+            text += " | Next: set channel #yourchannel"
         elif not bot.has_location:
             text += " | Next: zip <code>"
         elif not c["news"]["feeds"]:

@@ -10,6 +10,10 @@ Removed. When cutting a release, rename that heading to the version and date.
 ## [Unreleased]
 
 ### Added
+- `set channel #name` picks the bot's channel by name, and a #hashtag channel
+  missing from the radio is added automatically.
+- `sudo meshbot --set <name> <value>` changes a setting from the Pi, and
+  `sudo meshbot` runs other maintenance options as the service user.
 - Initial bot for a MeshCore public channel, connected to a USB Companion
   node (Wio Tracker L1) over serial.
 - Weather: NWS forecast posted at 06/10/14/18/22, compacted to fit one packet;
@@ -67,6 +71,9 @@ Removed. When cutting a release, rename that heading to the version and date.
 - `--setup-code` and `--reset-admins` command-line options for recovery.
 
 ### Changed
+- The bot never posts on the Public channel. Until an admin sets a channel,
+  it only talks by DM. It says hello world once on each new channel.
+- Renaming the bot sends an advert so contact lists pick up the new name.
 - The config file is optional. Mesh-set values override it. The data
   directory defaults to systemd's `STATE_DIRECTORY` (`/var/lib/meshbot`).
 - Weather, quake, river, and air features stay off until a location is set,

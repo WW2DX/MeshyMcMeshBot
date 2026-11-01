@@ -19,6 +19,8 @@ chown -R meshbot:meshbot /opt/meshbot
 cp deploy/99-meshbot.rules /etc/udev/rules.d/
 udevadm control --reload-rules && udevadm trigger
 
+install -m 755 deploy/meshbot /usr/local/bin/meshbot
+
 cp deploy/meshbot.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable meshbot
@@ -37,7 +39,8 @@ if [ -f "$DATA/setup-code.txt" ]; then
   echo ">> Setup code: ${CODE:0:3}-${CODE:3:3}"
   echo ">> 1. From your phone, send an advert so the bot learns your node."
   echo ">> 2. When the bot appears in your contacts, DM it:  claim $CODE"
-  echo ">> 3. Then DM it:  zip <your ZIP code>"
+  echo ">> 3. Then DM it:  set channel #yourchannel   (the bot never posts on Public)"
+  echo ">> 4. Then DM it:  zip <your ZIP code>"
   echo ">> (Lost it? sudo cat $DATA/setup-code.txt)"
 else
   echo ">> Already claimed. Configure it over the mesh (DM the bot 'setup')."

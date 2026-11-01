@@ -16,7 +16,7 @@ FEATURES = ("weather", "news", "events", "mailbox", "bbs", "welcome",
 class Setting:
     key: str  # what admins type
     path: str  # dotted path in the config dict
-    kind: str  # str | int | float | bool | times | quiet | choice | secret | zip
+    kind: str  # str | int | float | bool | times | quiet | choice | secret | zip | channel
     help: str
     choices: tuple = ()
 
@@ -25,7 +25,7 @@ SETTINGS = [
     Setting("zip", "location.zip", "zip", "US ZIP code for weather & alerts"),
     Setting("area", "location.name", "str", "area name used in welcomes"),
     Setting("botname", "bot.name", "str", "the bot's node name"),
-    Setting("channel", "bot.channel_idx", "int", "channel slot the bot uses (0 = Public)"),
+    Setting("channel", "bot.channel", "channel", "channel to post on, e.g. #mycounty (never Public)"),
     Setting("prefix", "bot.prefix", "str", "channel command prefix"),
     Setting("quiet", "bot.quiet_hours", "quiet", "quiet hours, e.g. 22:30-05:30, or off"),
     Setting("adverthours", "bot.advert_hours", "float", "hours between bot adverts"),
@@ -76,6 +76,14 @@ def parse(setting: Setting, raw: str):
     if setting.kind in ("str", "secret"):
         if not raw:
             raise ValueError("needs a value")
+        return raw
+    if setting.kind == "channel":
+        if not raw:
+            raise ValueError("needs a value, e.g. #mycounty")
+        if low.lstrip("#") == "public":
+            raise ValueError("the bot never posts on Public. Use your local channel, e.g. #mycounty")
+        if raw.isdigit():
+            raise ValueError("use the channel's name, e.g. #mycounty")
         return raw
     if setting.kind == "zip":
         from .location import normalize_zip

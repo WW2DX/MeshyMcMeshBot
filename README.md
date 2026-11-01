@@ -48,24 +48,30 @@ serial port and starts the bot. It ends by printing a one-time **setup code**:
 >> Setup code: 046-773
 >> 1. From your phone, send an advert so the bot learns your node.
 >> 2. When the bot appears in your contacts, DM it:  claim 046773
->> 3. Then DM it:  zip <your ZIP code>
+>> 3. Then DM it:  set channel #yourchannel   (the bot never posts on Public)
+>> 4. Then DM it:  zip <your ZIP code>
 ```
 
 To update later, `git pull && sudo ./deploy/install.sh`. Settings are kept.
 
 ## Set it up from the mesh
 
-1. **Hello world.** The first time the bot connects to the L1, it posts
-   `👋 Hello world!` on the channel and advertises itself.
+1. **Find it.** The bot advertises itself when it starts. It doesn't post on
+   any channel yet, and it never posts on Public.
 2. **Claim it.** Send an advert from your phone. MeshCore nodes can only
    read DMs from nodes they know, so this step is required. Once the bot shows
    up in your contacts, DM it `claim 046773`. You're now its admin. The code
    works once, and after 5 wrong guesses in an hour the bot refuses more tries.
-3. **Set the area.** DM `zip 68102`. The bot looks up the coordinates,
+   Everything from here on is sent in that same private chat. Commands sent
+   on a channel are ignored.
+3. **Pick its channel.** DM `set channel #mycounty`. If the radio doesn't
+   have that #hashtag channel yet, the bot adds it. After a restart it posts
+   `👋 Hello world!` there. (`set botname <name>` renames the node too.)
+4. **Set the area.** DM `zip 68102`. The bot looks up the coordinates,
    timezone, and county, restarts itself, and posts `📍 Now serving Douglas
    County!` Weather, flood, quake, and air-quality features switch on at this
    point.
-4. **Optional extras,** all by DM:
+5. **Optional extras,** all by DM:
 
 | Command | Does |
 |---|---|
@@ -86,9 +92,11 @@ right away. Repeated restarts don't flood the mesh with adverts.
 
 **Recovery (on the Pi):**
 - Lost the setup code: `sudo cat /var/lib/meshbot/setup-code.txt`
-- Lost admin access: `sudo -u meshbot STATE_DIRECTORY=/var/lib/meshbot
-  /opt/meshbot/venv/bin/python -m meshymcmeshbot --reset-admins && sudo
-  systemctl restart meshbot`, then claim again with the new code.
+- Lost admin access: `sudo meshbot --reset-admins && sudo systemctl restart
+  meshbot`, then claim again with the new code.
+- Change a setting without the mesh: `sudo meshbot --set channel
+  '#mycounty' --set botname CountyBot && sudo systemctl restart meshbot`.
+  (Quote `#` names, or the shell treats them as a comment.)
 
 **Prefer a config file?** It's optional. Put any of the settings from
 `config.example.yaml` in `/etc/meshbot/config.yaml`. Values set over the mesh

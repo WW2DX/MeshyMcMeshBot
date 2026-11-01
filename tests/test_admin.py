@@ -105,3 +105,22 @@ def test_setting_parsers():
     with pytest.raises(ValueError):
         settings.parse(BY_KEY["wxtimes"], "25")
     assert settings.show(BY_KEY["airnowkey"], "secret123") == "(set)"
+
+
+def test_channel_setting_never_public():
+    assert settings.parse(BY_KEY["channel"], "#dutchess-county") == "#dutchess-county"
+    for bad in ("Public", "#public", "0", ""):
+        with pytest.raises(ValueError):
+            settings.parse(BY_KEY["channel"], bad)
+
+
+def test_hello_needs_a_channel_and_repeats_on_a_new_one(bot):
+    bot.t.channel_name = ""
+    run(bot.startup_hooks[0]())
+    assert drain(bot) == []
+    bot.t.channel_name = "#one"
+    run(bot.startup_hooks[0]())
+    assert "Hello world" in drain(bot)[0]
+    bot.t.channel_name = "#two"
+    run(bot.startup_hooks[0]())
+    assert "Hello world" in drain(bot)[0]

@@ -83,6 +83,8 @@ To update later, `git pull && sudo ./deploy/install.sh`. Settings are kept.
 | `add admin <name or @keyprefix>` | another admin (the node must have advertised) |
 | `list <kind>`, `del <kind> <n>` | review or remove items in those lists |
 | `settings` | everything you can `set` |
+| `set wxchan #weather`, `set alertchan #mycounty,#weather` | send a kind of post to other channel(s) (also `newschan`, `eventchan`, `statschan`, `introchan`, `quakechan`, `riverchan`, `airchan`, `rptchan`) |
+| `add channel #name` | answer commands on another channel too |
 | `set <name> <value>` / `set <name>` / `unset <name>` | change, show, or reset one setting, e.g. `set quiet 23:00-06:00`, `set wxtimes 7,12,17`, `set area Riverbend Mesh`, `set quakes off`, `set botname CountyBot` |
 | `restart` | restart the bot |
 
@@ -114,8 +116,8 @@ STATE_DIRECTORY=./data ./venv/bin/python -m meshymcmeshbot --console
 
 The setup code is in the log (and in `data/setup-code.txt`). Type
 `dm Me: claim <code>`, then `dm Me: zip 68102`, to walk through the real setup.
-Type `Alice: !wx` to post on the channel, `dm Alice: mail Bob hi` to DM the
-bot, and `advert Bob` to simulate Bob's node showing up. `repeater Hilltop`
+Type `Alice: !wx` to post on the main channel, `#weather Alice: !wx` to post
+on another channel, `dm Alice: mail Bob hi` to DM the bot, and `advert Bob` to simulate Bob's node showing up. `repeater Hilltop`
 simulates a repeater advert, and `relay Hilltop` simulates a packet relayed
 through it.
 

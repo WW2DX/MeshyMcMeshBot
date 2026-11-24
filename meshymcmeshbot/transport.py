@@ -36,6 +36,25 @@ class Incoming:
     hops: int | None = None  # None = unknown / direct route
     snr: float | None = None
     ts: int = 0
+    channel: str = ""  # which channel a "chan" message came in on
+
+
+def chan_key(name: str) -> str:
+    """Channel names compare without case or the leading #."""
+    return name.strip().lower().lstrip("#")
+
+
+def wanted_channels(cfg: dict) -> list[str]:
+    """Every channel the bot uses: the main one, routed posts, and extras."""
+    names = [cfg["bot"]["channel"], *cfg["bot"]["channels"]]
+    for targets in cfg["routes"].values():
+        names += targets
+    out, seen = [], set()
+    for n in names:
+        if n and chan_key(n) not in seen:
+            seen.add(chan_key(n))
+            out.append(n.strip())
+    return out
 
 
 @dataclass
@@ -59,11 +78,11 @@ class Transport:
     on_relay: RelayHandler
     self_name: str = "bot"
     self_key: str = ""
-    channel_name: str = ""  # empty until the bot has a channel to post on
+    channel_name: str = ""  # the main channel; empty until the bot has one to post on
 
     async def start(self): ...
     async def close(self): ...
-    async def send_channel(self, text: str) -> bool: ...
+    async def send_channel(self, text: str, channel: str | None = None) -> bool: ...
     async def send_dm(self, pubkey: str, text: str) -> bool: ...
     async def advert(self): ...
     async def status(self) -> str:
@@ -72,6 +91,10 @@ class Transport:
     def contacts(self) -> dict[str, dict]:
         """pubkey -> {"name", "last_advert", "lat", "lon", "type"}"""
         return {}
+
+    def channel_names(self) -> list[str]:
+        """Every channel the bot is on, as named on the radio."""
+        return []
 
     def find_contact_by_prefix(self, prefix: str) -> str | None:
         prefix = prefix.lower()
@@ -104,7 +127,7 @@ class MeshCoreTransport(Transport):
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.mc = None
-        self.channel_idx: int | None = None
+        self._chans: dict[str, tuple[int, str]] = {}  # chan_key -> (slot, name on the radio)
         self._recent_adverts: dict[str, float] = {}
 
     async def start(self):
@@ -141,7 +164,7 @@ class MeshCoreTransport(Transport):
         # The Pi has NTP; the radio may not. Message timestamps come from the radio.
         await self.mc.commands.set_time(int(time.time()))
 
-        await self._find_channel()
+        await self._find_channels()
 
         self.mc.auto_update_contacts = True
         await self.mc.ensure_contacts()
@@ -153,43 +176,55 @@ class MeshCoreTransport(Transport):
         self.mc.subscribe(EventType.RX_LOG_DATA, self._on_rx_log)
         await self.mc.start_auto_message_fetching()
 
-    async def _find_channel(self):
-        """Point the bot at its channel by name, adding a #hashtag channel if needed."""
+    async def _find_channels(self):
+        """Map each channel the bot uses to a radio slot, adding missing #hashtag channels."""
         from meshcore import EventType
 
-        want = self.cfg["bot"]["channel"].strip()
-        if not want:
+        main = self.cfg["bot"]["channel"].strip()
+        if not main:
             log.warning("No channel set, so the bot won't post. An admin can DM 'set channel #name'.")
+        wanted = wanted_channels(self.cfg)
+        if not wanted:
             return
         info = await self.mc.commands.send_device_query()
         slots = 8 if info.type == EventType.ERROR else info.payload.get("max_channels", 8)
-        free = None
+        on_radio, free = {}, []
         for i in range(slots):
             res = await self.mc.commands.get_channel(i)
             if res.type == EventType.ERROR:
                 break
             name = res.payload.get("channel_name", "")
-            if not name and free is None:
-                free = i
-            if name and name.lower().lstrip("#") == want.lower().lstrip("#"):
-                if res.payload.get("channel_secret") == PUBLIC_CHANNEL_SECRET:
+            if not name:
+                free.append(i)
+            else:
+                on_radio.setdefault(chan_key(name), (i, name, res.payload.get("channel_secret")))
+
+        for want in wanted:
+            if chan_key(want) in on_radio:
+                i, name, secret = on_radio[chan_key(want)]
+                if secret == PUBLIC_CHANNEL_SECRET:
                     log.error("Channel %r is the Public channel; the bot won't post there.", name)
-                    return
-                self.channel_idx, self.channel_name = i, name
-                log.info("Bot channel is %r (slot %d)", name, i)
-                return
-        if not want.startswith("#"):
-            log.error("Channel %r isn't on the radio. Use a #hashtag channel to have it added.", want)
-            return
-        if free is None:
-            log.error("No free channel slot on the radio for %r", want)
-            return
-        res = await self.mc.commands.set_channel(free, want)
-        if res.type == EventType.ERROR:
-            log.error("Couldn't add channel %r: %s", want, res.payload)
-            return
-        self.channel_idx, self.channel_name = free, want
-        log.info("Added channel %r to the radio (slot %d)", want, free)
+                    continue
+            elif not want.startswith("#"):
+                log.error("Channel %r isn't on the radio. Use a #hashtag channel to have it added.", want)
+                continue
+            elif not free:
+                log.error("No free channel slot on the radio for %r", want)
+                continue
+            else:
+                i, name = free.pop(0), want
+                res = await self.mc.commands.set_channel(i, name)
+                if res.type == EventType.ERROR:
+                    log.error("Couldn't add channel %r: %s", name, res.payload)
+                    continue
+                log.info("Added channel %r to the radio (slot %d)", name, i)
+            self._chans[chan_key(want)] = (i, name)
+            log.info("On channel %r (slot %d)", name, i)
+        if main and chan_key(main) in self._chans:
+            self.channel_name = self._chans[chan_key(main)][1]
+
+    def channel_names(self) -> list[str]:
+        return [name for _, name in self._chans.values()]
 
     @staticmethod
     def _hops(p: dict) -> int | None:
@@ -200,7 +235,8 @@ class MeshCoreTransport(Transport):
 
     async def _on_channel(self, event):
         p = event.payload
-        if self.channel_idx is None or p.get("channel_idx") != self.channel_idx:
+        channel = next((n for i, n in self._chans.values() if i == p.get("channel_idx")), None)
+        if channel is None:
             return
         raw = p.get("text", "")
         # The firmware sends group text as "<sender name>: <message>".
@@ -209,7 +245,7 @@ class MeshCoreTransport(Transport):
             name, text = "?", raw
         await self.on_message(Incoming(
             kind="chan", sender_name=name.strip(), text=text.strip(),
-            hops=self._hops(p), snr=p.get("SNR"), ts=p.get("sender_timestamp", 0),
+            hops=self._hops(p), snr=p.get("SNR"), ts=p.get("sender_timestamp", 0), channel=channel,
         ))
 
     async def _on_dm(self, event):
@@ -287,11 +323,13 @@ class MeshCoreTransport(Transport):
             }
         return out
 
-    async def send_channel(self, text: str) -> bool:
-        if self.channel_idx is None:
-            log.info("No channel set; not posting: %s", text)
+    async def send_channel(self, text: str, channel: str | None = None) -> bool:
+        target = channel or self.channel_name
+        slot = self._chans.get(chan_key(target)) if target else None
+        if slot is None:
+            log.info("Not on channel %r; not posting: %s", target or "(none set)", text)
             return False
-        res = await self.mc.commands.send_chan_msg(self.channel_idx, text)
+        res = await self.mc.commands.send_chan_msg(slot[0], text)
         if res.is_error():
             log.warning("Channel send failed: %s", res.payload)
             return False
@@ -327,7 +365,8 @@ class MeshCoreTransport(Transport):
 class ConsoleTransport(Transport):
     """Type lines to simulate the mesh:
 
-        Alice: !wx              Alice posts on the channel
+        Alice: !wx              Alice posts on the main channel
+        #weather Alice: !wx     Alice posts on #weather
         dm Alice: mail Bob hi   Alice DMs the bot
         advert Bob              Bob's node advertises (new names get a welcome)
         repeater Hilltop        a repeater named Hilltop advertises
@@ -378,9 +417,11 @@ class ConsoleTransport(Transport):
         if word == "relay":
             await self.on_relay([self._key_for(rest.strip(), NODE_REPEATER)[:2]])
             return
-        kind = "chan"
+        kind, channel = "chan", self.channel_name
         if line.startswith("dm "):
             kind, line = "dm", line[3:]
+        elif word.startswith("#"):
+            channel, line = word, rest
         name, sep, text = line.partition(": ")
         if not sep:
             print("  (format is 'Name: message' or 'dm Name: message')")
@@ -389,14 +430,19 @@ class ConsoleTransport(Transport):
         await self.on_message(Incoming(
             kind=kind, sender_name=name.strip(), text=text.strip(),
             sender_key=key if kind == "dm" else None,
-            hops=1, snr=7.5, ts=int(time.time()),
+            hops=1, snr=7.5, ts=int(time.time()), channel=channel if kind == "chan" else "",
         ))
 
     def contacts(self) -> dict[str, dict]:
         return self._contacts
 
-    async def send_channel(self, text: str) -> bool:
-        print(f"[CHAN] {self.self_name}: {text}", flush=True)
+    def channel_names(self) -> list[str]:
+        return [self.channel_name, *(n for n in wanted_channels(self.cfg)
+                                     if chan_key(n) != chan_key(self.channel_name))]
+
+    async def send_channel(self, text: str, channel: str | None = None) -> bool:
+        where = "" if not channel or chan_key(channel) == chan_key(self.channel_name) else f" {channel}"
+        print(f"[CHAN{where}] {self.self_name}: {text}", flush=True)
         return True
 
     async def send_dm(self, pubkey: str, text: str) -> bool:

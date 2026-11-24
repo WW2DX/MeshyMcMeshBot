@@ -16,7 +16,7 @@ FEATURES = ("weather", "news", "events", "mailbox", "bbs", "welcome", "intro",
 class Setting:
     key: str  # what admins type
     path: str  # dotted path in the config dict
-    kind: str  # str | int | float | bool | times | quiet | choice | secret | zip | channel
+    kind: str  # str | int | float | bool | times | quiet | choice | secret | zip | channel | channels
     help: str
     choices: tuple = ()
 
@@ -26,6 +26,13 @@ SETTINGS = [
     Setting("area", "location.name", "str", "area name used in welcomes"),
     Setting("botname", "bot.name", "str", "the bot's node name"),
     Setting("channel", "bot.channel", "channel", "channel to post on, e.g. #mycounty (never Public)"),
+    *(Setting(key, f"routes.{route}", "channels", f"where {what} post; unset = main channel")
+      for key, route, what in (
+          ("wxchan", "weather", "forecasts"), ("alertchan", "alerts", "weather alerts"),
+          ("newschan", "news", "headlines"), ("eventchan", "events", "events"),
+          ("statschan", "stats", "mesh stats"), ("introchan", "intro", "the weekly intro"),
+          ("quakechan", "quakes", "earthquakes"), ("riverchan", "rivers", "flood alerts"),
+          ("airchan", "air", "air quality"), ("rptchan", "repeaters", "repeater outages"))),
     Setting("prefix", "bot.prefix", "str", "channel command prefix"),
     Setting("quiet", "bot.quiet_hours", "quiet", "quiet hours, e.g. 22:30-05:30, or off"),
     Setting("adverthours", "bot.advert_hours", "float", "hours between bot adverts"),
@@ -60,6 +67,7 @@ LISTS = {
     "gauge": ("rivers.gauges", "add gauge <NWS gauge id, e.g. OMHN1>"),
     "repeater": ("repeaters.watch", "add repeater <name or key prefix>"),
     "admin": ("bot.admins", "add admin <name or @keyprefix>"),
+    "channel": ("bot.channels", "add channel #name (answers commands there)"),
 }
 
 TRUE = {"on", "yes", "true", "1", "enable", "enabled"}
@@ -74,6 +82,17 @@ def parse_time(t: str) -> str:
     return f"{int(m.group(1)):02d}:{m.group(2) or '00'}"
 
 
+def parse_channel(raw: str) -> str:
+    raw = raw.strip()
+    if not raw:
+        raise ValueError("needs a value, e.g. #mycounty")
+    if raw.lower().lstrip("#") == "public":
+        raise ValueError("the bot never posts on Public. Use your local channel, e.g. #mycounty")
+    if raw.isdigit():
+        raise ValueError("use the channel's name, e.g. #mycounty")
+    return raw
+
+
 def parse(setting: Setting, raw: str):
     raw = raw.strip()
     low = raw.lower()
@@ -82,13 +101,12 @@ def parse(setting: Setting, raw: str):
             raise ValueError("needs a value")
         return raw
     if setting.kind == "channel":
-        if not raw:
-            raise ValueError("needs a value, e.g. #mycounty")
-        if low.lstrip("#") == "public":
-            raise ValueError("the bot never posts on Public. Use your local channel, e.g. #mycounty")
-        if raw.isdigit():
-            raise ValueError("use the channel's name, e.g. #mycounty")
-        return raw
+        return parse_channel(raw)
+    if setting.kind == "channels":
+        names = [n for n in re.split(r"[,\s]+", raw) if n]
+        if not names:
+            raise ValueError("needs a channel, e.g. #weather ('unset' goes back to the main channel)")
+        return [parse_channel(n) for n in names]
     if setting.kind == "zip":
         from .location import normalize_zip
         try:
@@ -133,6 +151,8 @@ def show(setting: Setting, value) -> str:
         return ",".join(value) if value else "off"
     if setting.kind == "quiet":
         return f"{value['start']}-{value['end']}" if value else "off"
+    if setting.kind == "channels":
+        return ",".join(value) if value else "main channel"
     return "(not set)" if value in (None, "") else str(value)
 
 
@@ -156,6 +176,8 @@ def parse_list_item(kind: str, raw: str):
         if not re.match(r"^[A-Za-z0-9]{4,6}$", raw):
             raise ValueError("gauge IDs look like OMHN1 (see water.noaa.gov)")
         return raw.upper()
+    if kind == "channel":
+        return parse_channel(raw)
     return raw
 
 

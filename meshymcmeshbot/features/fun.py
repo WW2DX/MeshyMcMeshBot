@@ -4,6 +4,8 @@ import time
 from astral import LocationInfo, moon
 from astral.sun import sun
 
+from ..transport import chan_key
+
 # astral's moon.phase() runs 0-28: 0 new, 7 first quarter, 14 full, 21 last quarter.
 MOON_PHASES = [
     (1, "🌑 New"), (6, "🌒 Waxing crescent"), (8, "🌓 First quarter"),
@@ -121,7 +123,7 @@ def setup(bot):
 
     if bot.cfg["stats"]["post_times"]:
         async def post_stats():
-            await bot.post(stats_text())
+            await bot.post(stats_text(), kind="stats")
         bot.schedule("stats", post_stats, times=bot.cfg["stats"]["post_times"])
 
     # --- bulletin board -----------------------------------------------------
@@ -165,12 +167,19 @@ def setup(bot):
 
     # --- admin --------------------------------------------------------------
 
-    @bot.command("say", "say <text>: broadcast on the channel", admin=True, dm_only=True)
+    @bot.command("say", "say [#channel] <text>: broadcast on the main (or given) channel",
+                 admin=True, dm_only=True)
     async def _say(ctx):
-        if ctx.args:
-            await bot.post(f"📢 {ctx.args}")
+        channel, text = None, ctx.args
+        first, _, rest = ctx.args.partition(" ")
+        if first.startswith("#") and rest.strip():
+            if chan_key(first) not in {chan_key(n) for n in bot.t.channel_names()}:
+                return f"I'm not on {first}. Add it with 'add channel {first}'."
+            channel, text = first, rest.strip()
+        if text:
+            await bot.post(f"📢 {text}", channel=channel)
             return "Sent."
-        return "Usage: say <text>"
+        return "Usage: say [#channel] <text>"
 
     @bot.command("status", "status: bot health", admin=True, dm_only=True)
     async def _status(ctx):

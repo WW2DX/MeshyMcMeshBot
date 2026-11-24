@@ -87,7 +87,7 @@ class Weather:
         return [f["properties"] for f in data.get("features", [])]
 
     async def post_forecast(self):
-        await self.bot.post(await self.forecast(self.cfg["periods"]))
+        await self.bot.post(await self.forecast(self.cfg["periods"]), kind="weather")
 
     async def poll_alerts(self):
         min_sev = SEVERITY.get(self.cfg["alerts"]["min_severity"], 3)
@@ -103,7 +103,7 @@ class Weather:
             if a.get("messageType") == "Cancel" or SEVERITY.get(a.get("severity"), 0) < min_sev:
                 continue
             log.info("New alert: %s", a.get("headline"))
-            await self.bot.post(format_alert(a, self.bot.fmt_time))
+            await self.bot.post(format_alert(a, self.bot.fmt_time), kind="alerts")
 
 
 def setup(bot):

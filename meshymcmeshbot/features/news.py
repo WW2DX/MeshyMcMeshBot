@@ -46,7 +46,7 @@ class News:
         for item in fresh:
             self.bot.db.mark_seen("news", item["id"])
         if fresh:
-            await self.bot.post("📰 " + " | ".join(self.fmt(i) for i in fresh))
+            await self.bot.post("📰 " + " | ".join(self.fmt(i) for i in fresh), kind="news")
 
 
 def setup(bot):

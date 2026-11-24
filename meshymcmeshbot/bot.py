@@ -169,10 +169,16 @@ class Bot:
             budget -= len(self.t.self_name.encode()) + 2
         return budget
 
-    async def post(self, text: str):
-        """Queue a message for the channel."""
-        for part in paginate(text, self._budget("chan"), self.bcfg["max_channel_parts"]):
-            await self._queue.put(("chan", None, part))
+    def route(self, kind: str | None) -> list[str]:
+        """The channels a kind of post goes to; empty means the main channel."""
+        return list(self.cfg["routes"].get(kind) or []) if kind else []
+
+    async def post(self, text: str, kind: str | None = None, channel: str | None = None):
+        """Queue a message for a channel: the given one, where this kind of post
+        is routed, or the main channel."""
+        for target in [channel] if channel else self.route(kind) or [None]:
+            for part in paginate(text, self._budget("chan"), self.bcfg["max_channel_parts"]):
+                await self._queue.put(("chan", target, part))
 
     async def dm(self, pubkey: str, text: str):
         for part in paginate(text, self._budget("dm"), self.bcfg["max_dm_parts"]):
@@ -182,14 +188,14 @@ class Bot:
         if msg.kind == "dm" and msg.sender_key:
             await self.dm(msg.sender_key, text)
         else:
-            await self.post(text)
+            await self.post(text, channel=msg.channel or None)
 
     async def _sender(self):
         while True:
             kind, key, text = await self._queue.get()
             try:
                 if kind == "chan":
-                    await self.t.send_channel(text)
+                    await self.t.send_channel(text, key)
                 else:
                     await self.t.send_dm(key, text)
             except Exception:
@@ -229,7 +235,7 @@ class Bot:
             return
 
         if msg.kind == "chan":
-            if self._is_stale(msg) or self._on_cooldown(msg.sender_name):
+            if self._is_stale(msg) or self._on_cooldown(f"{msg.channel}|{msg.sender_name}"):
                 return
             if cmd.dm_only:
                 await self.reply(msg, f"@[{msg.sender_name}] DM me '{cmd.name}' for that.")

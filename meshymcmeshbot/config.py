@@ -20,6 +20,8 @@ DEFAULTS = {
         # channel is added to the radio if missing. The bot never posts on
         # Public; until this is set it only talks over DM.
         "channel": "",
+        # Extra channels where the bot answers commands but posts nothing on its own.
+        "channels": [],
         "prefix": "!",
         # Byte budget per message. Channel messages lose room to "<name>: ".
         "max_msg_bytes": 140,
@@ -87,6 +89,12 @@ DEFAULTS = {
     "stats": {
         # Nightly "mesh today" digest on the channel. Empty list disables it.
         "post_times": ["21:00"],
+    },
+    # Which channel(s) each kind of post goes to, e.g. "weather": ["#weather"].
+    # Empty means the main channel. The bot also answers commands on these.
+    "routes": {
+        "weather": [], "alerts": [], "news": [], "events": [], "stats": [],
+        "intro": [], "quakes": [], "rivers": [], "air": [], "repeaters": [],
     },
     "intro": {
         # Weekly "here's how to use me" post on the channel.

@@ -32,7 +32,7 @@ def setup(bot):
             if not new:
                 log.info("Skipping the weekly intro: no new nodes since the last one")
                 return
-        await bot.post(intro_text())
+        await bot.post(intro_text(), kind="intro")
         bot.db.set_meta("intro_last", str(int(time.time())))
 
     if cfg["enabled"] and cfg["times"]:
@@ -40,6 +40,6 @@ def setup(bot):
 
     @bot.command("intronow", "intronow: post the intro to the channel now", admin=True)
     async def _intronow(ctx):
-        await bot.post(intro_text())
+        await bot.post(intro_text(), kind="intro")
         bot.db.set_meta("intro_last", str(int(time.time())))
         return "Posted." if ctx.is_dm else None

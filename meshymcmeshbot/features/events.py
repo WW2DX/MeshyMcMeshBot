@@ -71,7 +71,7 @@ class Events:
     async def post_digest(self):
         text = await self.summary(self.cfg["days_ahead"], 4)
         if text:
-            await self.bot.post(text)
+            await self.bot.post(text, kind="events")
 
 
 def setup(bot):

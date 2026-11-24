@@ -51,7 +51,7 @@ class Repeaters:
 
     async def notify(self, text: str):
         if self.cfg["notify"] == "channel":
-            await self.bot.post(text)
+            await self.bot.post(text, kind="repeaters")
             return
         for prefix in self.bot.bcfg["admins"]:
             key = self.bot.t.find_contact_by_prefix(prefix)

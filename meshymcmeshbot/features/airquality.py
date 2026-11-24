@@ -58,10 +58,10 @@ class Air:
         name, advice = category(aqi)
         if aqi >= self.cfg["alert_aqi"] and not alerted:
             self.bot.db.set_meta("aqi_alerted", "1")
-            await self.bot.post(f"😷 Air quality is {name} (AQI {aqi}). {advice}".strip())
+            await self.bot.post(f"😷 Air quality is {name} (AQI {aqi}). {advice}".strip(), kind="air")
         elif alerted and aqi < self.cfg["alert_aqi"] - HYSTERESIS:
             self.bot.db.set_meta("aqi_alerted", "0")
-            await self.bot.post(f"🌤 Air quality has improved: {name} (AQI {aqi}).")
+            await self.bot.post(f"🌤 Air quality has improved: {name} (AQI {aqi}).", kind="air")
 
 
 def setup(bot):

@@ -10,6 +10,11 @@ Removed. When cutting a release, rename that heading to the version and date.
 ## [Unreleased]
 
 ### Added
+- The bot can use several channels. Each kind of post can go to its own
+  channel(s), e.g. `set wxchan #weather` or `set alertchan #mycounty,#weather`.
+  `add channel #name` answers commands on a channel without posting there.
+  The bot replies on the channel a command came from, adds missing #hashtag
+  channels to the radio, and `say #channel <text>` posts to a specific one.
 - A weekly intro post on the channel (Sundays at noon by default) tells
   newcomers the bot exists and how to use it. It's skipped in weeks when no
   new nodes appeared. Admins can tune it with `introday`, `introtimes`,
@@ -76,6 +81,7 @@ Removed. When cutting a release, rename that heading to the version and date.
 - `--setup-code` and `--reset-admins` command-line options for recovery.
 
 ### Changed
+- The 30-second command cooldown is per person, per channel.
 - The bot never posts on the Public channel. Until an admin sets a channel,
   it only talks by DM. It says hello world once on each new channel.
 - Renaming the bot sends an advert so contact lists pick up the new name.

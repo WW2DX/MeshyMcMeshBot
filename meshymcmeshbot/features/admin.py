@@ -259,6 +259,9 @@ def setup(bot):
         else:
             where = "❌ no ZIP"
         chan = f"✅ {bot.t.channel_name}" if bot.t.channel_name else "❌ no channel"
+        others = len(bot.t.channel_names()) - bool(bot.t.channel_name)
+        if others > 0:
+            chan += f" +{others}"
         n = lambda path: len(settings.get_path(c, path))
         text = (f"Setup: {chan} | {where} | admins {n('bot.admins')} | feeds {n('news.feeds')} | "
                 f"cals {n('events.ical_urls')} | gauges {n('rivers.gauges')} | "

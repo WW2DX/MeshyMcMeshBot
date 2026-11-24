@@ -44,7 +44,7 @@ class Quakes:
             if quiet and q["mag"] < self.cfg["urgent_magnitude"]:
                 continue
             log.info("Quake: %s", q.get("title"))
-            await self.bot.post(f"🌎 Earthquake {self.fmt(q)} (USGS)")
+            await self.bot.post(f"🌎 Earthquake {self.fmt(q)} (USGS)", kind="quakes")
 
 
 def setup(bot):

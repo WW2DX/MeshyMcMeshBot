@@ -133,6 +133,10 @@ Notes expire after 14 days, and the board keeps the 50 newest.
 
 ## Scheduled posts on the channel
 
+These go to the bot's main channel unless the admins have sent some of them
+to other channels, such as forecasts to #weather. The bot answers `!`
+commands on every channel it posts to, and replies on the channel you asked on.
+
 | What | When |
 |---|---|
 | Weather forecast | 6am, 10am, 2pm, 6pm, 10pm |
@@ -160,8 +164,8 @@ of M5 or larger.
 
 LoRa airtime is shared by everyone, so the bot keeps itself in check:
 
-- Each person can run one channel command every 30 seconds. Extra commands
-  are silently ignored.
+- Each person can run one command every 30 seconds on each channel. Extra
+  commands are silently ignored. DMs have no limit.
 - Channel replies are at most 2 messages. For the full version, DM the bot.
 - The bot waits a few seconds between its own transmissions.
 
@@ -190,6 +194,8 @@ then sets the area with `zip <code>`. Admins can add other admins with
 | `setup` | Checklist of what's configured and what to do next |
 | `set channel #name` | The channel the bot posts and listens on. A #hashtag channel is added to the bot's radio automatically. The bot never posts on Public, and stays quiet on channels until this is set. It says hello once on each new channel. |
 | `set botname <name>` | Rename the bot's node |
+| `set wxchan #weather` | Send forecasts to another channel. Each kind of post has one: `wxchan`, `alertchan`, `newschan`, `eventchan`, `statschan`, `introchan`, `quakechan`, `riverchan`, `airchan`, `rptchan`. List several to post in each, e.g. `set alertchan #dutchess-county,#weather`. `unset wxchan` goes back to the main channel. |
+| `add channel #name` | Also answer commands on a channel without posting there on its own |
 | `set introday sun`, `set introtimes 12`, `set intromsg <text>`, `set intro off` | When the weekly intro posts and what it says (`{bot}`, `{prefix}` and `{area}` are filled in) |
 | `zip <code>` | Set the bot's area from a US ZIP code |
 | `settings` | List everything that can be changed |
@@ -205,7 +211,7 @@ Day-to-day admin commands:
 
 | Command | What it does |
 |---|---|
-| `say <text>` | Broadcast an announcement on the channel |
+| `say [#channel] <text>` | Broadcast an announcement on the main channel, or on another channel the bot is on |
 | `wxnow` / `newsnow` / `intronow` | Post the forecast / new headlines / the bot's intro right now |
 | `addevent YYYY-MM-DD [HH:MM] <title>` | Add a community event |
 | `delevent <id>` | Remove an event |

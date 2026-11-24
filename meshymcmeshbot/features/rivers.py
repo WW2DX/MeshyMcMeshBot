@@ -79,9 +79,9 @@ class Rivers:
                     msg = f"🌊 {g['name']} at {ft(o)}: {LABELS[obs_cat]}."
                 else:
                     msg = f"🌊 {g['name']} forecast to reach {ft(f)}: {LABELS[fc_cat]} (now {ft(o)})."
-                await self.bot.post(msg)
+                await self.bot.post(msg, kind="rivers")
             elif last >= self.alert_rank and level < self.alert_rank:
-                await self.bot.post(f"🌊 {g['name']} back below {self.cfg['alert_category']} flood stage ({ft(o)}).")
+                await self.bot.post(f"🌊 {g['name']} back below {self.cfg['alert_category']} flood stage ({ft(o)}).", kind="rivers")
 
 
 def setup(bot):

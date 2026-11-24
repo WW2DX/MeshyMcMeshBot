@@ -8,12 +8,19 @@ radio:
 
 bot:
   name: "MeshyMcMeshBot"    # node name the radio advertises
-  channel: "#mycounty"      # channel it posts on; a #hashtag is added to the radio. Never Public.
+  channel: "#mycounty"      # main channel; a #hashtag is added to the radio. Never Public.
+  # channels: ["#mytown"]   # extra channels where it only answers commands
   prefix: "!"               # channel commands look like "!wx"
   # Admin public keys (12+ hex chars). Usually set by 'claim' over the mesh instead.
   # admins:
   #   - "a1b2c3d4e5f6"
   quiet_hours: { start: "22:30", end: "05:30" }   # scheduled posts pause; alerts don't
+
+# Send some kinds of posts to other channels (default: the main channel).
+# Kinds: weather alerts news events stats intro quakes rivers air repeaters
+# routes:
+#   weather: ["#weather"]
+#   alerts: ["#mycounty", "#weather"]
 
 location:
   # zip: "68102"            # quote it! Fills in lat/lon, timezone and the area name.
